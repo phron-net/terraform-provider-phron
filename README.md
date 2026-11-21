@@ -7,4 +7,4 @@ resources or data sources are available.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+Apache License 2.0. See [LICENSE](LICENSE).
