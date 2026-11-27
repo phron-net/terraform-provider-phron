@@ -1,0 +1,33 @@
+# Runs `go mod tidy` and prints go.mod and go.sum as a base64 tarball in the
+# job log, for when the files cannot be produced on a developer workstation.
+# Push a branch named tidy/<anything> (or dispatch this workflow), then decode
+# the block between the markers from the log.
+name: tidy
+
+on:
+  push:
+    branches: ["tidy/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tidy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.27.3"
+          cache: false
+      - name: Tidy
+        run: go mod tidy
+      - name: Print the result
+        run: |
+          tar czf "$RUNNER_TEMP/mod.tgz" go.mod go.sum
+          sha256sum "$RUNNER_TEMP/mod.tgz"
+          echo "-----BEGIN MOD-----"
+          base64 -w 0 "$RUNNER_TEMP/mod.tgz" | fold -w 1000
+          echo
+          echo "-----END MOD-----"
