@@ -155,13 +155,21 @@ func TestBucketLifecycle(t *testing.T) {
 	}
 
 	read := *m
-	read.LimitBytes, read.ObjectLock = types.Int64Null(), types.BoolValue(false)
+	read.LimitBytes, read.ObjectLock = types.Int64Value(1), types.BoolValue(false)
 	gone, err := r.doRead(ctx, &read)
 	if err != nil || gone {
 		t.Fatalf("read: gone=%v err=%v", gone, err)
 	}
 	if read.LimitBytes.ValueInt64() != 1000 || !read.ObjectLock.ValueBool() || read.ObjectLockDefaultRetentionDays.ValueInt64() != 30 {
 		t.Fatalf("read mapped wrongly: %+v", read)
+	}
+
+	// A bucket that does not manage the limit (it comes from a
+	// phron_storage_bucket_limit resource) keeps limit_bytes null.
+	unmanaged := *m
+	unmanaged.LimitBytes = types.Int64Null()
+	if _, err := r.doRead(ctx, &unmanaged); err != nil || !unmanaged.LimitBytes.IsNull() {
+		t.Fatalf("an unmanaged limit must stay null: err=%v %+v", err, unmanaged.LimitBytes)
 	}
 
 	// Change the limit, then remove it.

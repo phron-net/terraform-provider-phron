@@ -195,10 +195,13 @@ func (r *storageBucketResource) doRead(ctx context.Context, m *storageBucketMode
 	}
 	m.ID = types.StringValue(b.GetName())
 	m.FullName = types.StringValue(b.GetName())
-	if b.LimitBytes != nil {
-		m.LimitBytes = types.Int64Value(b.GetLimitBytes())
-	} else {
+	// The limit is read back only while this resource manages it (limit_bytes
+	// is in the state). A bucket whose limit comes from a
+	// phron_storage_bucket_limit resource must not show that limit as a change.
+	if b.LimitBytes == nil {
 		m.LimitBytes = types.Int64Null()
+	} else if !m.LimitBytes.IsNull() {
+		m.LimitBytes = types.Int64Value(b.GetLimitBytes())
 	}
 	m.ObjectLock = types.BoolValue(b.GetObjectLock() != nil)
 	if lock := b.GetObjectLock(); lock != nil && lock.DefaultRetentionDays != nil {

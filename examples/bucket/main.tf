@@ -10,7 +10,7 @@ provider "phron" {}
 
 resource "phron_storage_bucket" "logs" {
   name     = "logs"
-  location = "fsn" # an id from data.phron_storage_overview.this.locations
+  location = "fsn1" # an id from data.phron_storage_overview.this.locations
 
   object_lock                        = true
   object_lock_default_retention_days = 30
@@ -21,12 +21,12 @@ resource "phron_storage_key" "writer" {
   name         = "log-writer"
   preset       = "read_write_objects"
   bucket_names = [phron_storage_bucket.logs.full_name]
-  location     = "fsn"
+  location     = "fsn1"
 }
 
 data "phron_storage_overview" "this" {
   depends_on = [phron_storage_bucket.logs]
-  location   = "fsn"
+  location   = "fsn1"
 }
 
 output "s3_endpoint" {
