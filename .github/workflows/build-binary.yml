@@ -1,0 +1,39 @@
+# Manual cross-build of the provider for a developer's own machine (for a
+# dev_overrides run against the live API). Not a release path: nothing is
+# tagged or published; the one artifact expires after a day.
+name: build-binary
+
+on:
+  workflow_dispatch:
+    inputs:
+      goos:
+        description: Target operating system
+        default: linux
+      goarch:
+        description: Target architecture
+        default: arm64
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.27.3"
+      - name: build
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ inputs.goos }}
+          GOARCH: ${{ inputs.goarch }}
+        run: |
+          go build -trimpath -ldflags "-s -w -X main.version=dev" -o terraform-provider-phron .
+          sha256sum terraform-provider-phron
+      - uses: actions/upload-artifact@v7
+        with:
+          name: terraform-provider-phron
+          path: terraform-provider-phron
+          retention-days: 1
