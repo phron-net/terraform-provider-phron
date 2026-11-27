@@ -26,9 +26,11 @@ var (
 
 // isAuthFailure reports whether the token endpoint refused the credentials.
 // That is not a temporary outage, so it is never retried.
+// An answer that is not an OAuth error (a gateway or tunnel page, a 5xx) has
+// no error code and is an outage, which the caller may retry.
 func isAuthFailure(err error) bool {
 	var re *oauth2.RetrieveError
-	return errors.As(err, &re)
+	return errors.As(err, &re) && re.ErrorCode != ""
 }
 
 func isNotFound(err error) bool {
@@ -39,7 +41,7 @@ func isNotFound(err error) bool {
 // "failed_precondition: ..." and not only the message.
 func describe(err error) string {
 	var re *oauth2.RetrieveError
-	if errors.As(err, &re) {
+	if errors.As(err, &re) && isAuthFailure(err) {
 		return fmt.Sprintf("the token endpoint refused the API client's credentials (%s). Check client_id, client_secret and project_id (or scope) against the console's API clients page; a deleted client or a rotated secret is refused the same way.", re.ErrorCode)
 	}
 	var ce *connect.Error
