@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"golang.org/x/oauth2"
 )
 
 // Timing knobs. They are variables so the unit tests can shrink them.
@@ -23,6 +24,13 @@ var (
 	maxRetryAttempts = 4
 )
 
+// isAuthFailure reports whether the token endpoint refused the credentials.
+// That is not a temporary outage, so it is never retried.
+func isAuthFailure(err error) bool {
+	var re *oauth2.RetrieveError
+	return errors.As(err, &re)
+}
+
 func isNotFound(err error) bool {
 	return err != nil && connect.CodeOf(err) == connect.CodeNotFound
 }
@@ -30,6 +38,10 @@ func isNotFound(err error) bool {
 // describe renders an API error with its Connect code, so a practitioner sees
 // "failed_precondition: ..." and not only the message.
 func describe(err error) string {
+	var re *oauth2.RetrieveError
+	if errors.As(err, &re) {
+		return fmt.Sprintf("the token endpoint refused the API client's credentials (%s). Check client_id, client_secret and project_id (or scope) against the console's API clients page; a deleted client or a rotated secret is refused the same way.", re.ErrorCode)
+	}
 	var ce *connect.Error
 	if errors.As(err, &ce) {
 		return fmt.Sprintf("%s: %s", ce.Code(), ce.Message())
@@ -60,7 +72,7 @@ func retryUnavailable(ctx context.Context, f func() error) error {
 	var err error
 	for attempt := 0; attempt < maxRetryAttempts; attempt++ {
 		err = f()
-		if err == nil || connect.CodeOf(err) != connect.CodeUnavailable {
+		if err == nil || isAuthFailure(err) || connect.CodeOf(err) != connect.CodeUnavailable {
 			return err
 		}
 		select {
@@ -79,7 +91,7 @@ func pollUntil(ctx context.Context, what string, timeout time.Duration, f func(c
 	defer cancel()
 	for {
 		done, err := f(ctx)
-		if err != nil && connect.CodeOf(err) != connect.CodeUnavailable {
+		if err != nil && (isAuthFailure(err) || connect.CodeOf(err) != connect.CodeUnavailable) {
 			return err
 		}
 		if err == nil && done {

@@ -14,11 +14,11 @@ terraform {
 provider "phron" {} # credentials from the environment, see below
 ```
 
-**Status: pre-release.** The provider builds and passes its unit tests in CI. It has not been published to the Terraform Registry and has not yet been run against the live API.
+**Status: pre-release.** The provider builds and passes its unit tests in CI, and has been run against the live API (Servers, SSH keys, buckets, bucket limits and keys; not every attribute and import path). It has not been published to the Terraform Registry.
 
 ## Credentials
 
-The provider signs in as an **API client**: an OAuth client-credentials machine user of your Organization, created on the console's API clients page (an Organization Admin makes one, picks its Role and sees the client ID and secret once). The page also shows the project id used in the scope. The Role of the API client decides what the provider may do; a Viewer cannot create or delete anything.
+The provider signs in as an **API client**: an OAuth client-credentials machine user of your Organization, created on the console's API clients page (an Organization Admin makes one, picks its Role and sees the client ID and secret once). The page also shows the project id used in the scope. The Role of the API client decides what the provider may do; a Viewer cannot create or delete anything, and a Developer can manage Servers, SSH keys, buckets and its own keys but cannot delete a bucket (`terraform destroy` of a bucket needs the Admin Role).
 
 | Attribute | Environment variable | Default |
 |---|---|---|
