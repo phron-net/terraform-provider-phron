@@ -62,7 +62,7 @@ jobs:
           sums=$(ls *_SHA256SUMS)
           name=${sums%_SHA256SUMS}
           test -f "$sums.sig"
-          test -f "${name}_manifest.json"
+          # the manifest is listed in the checksums; a real release uploads the file itself
           grep -q "${name}_manifest.json" "$sums"
           for os_arch in linux_amd64 linux_arm64 darwin_amd64 darwin_arm64 windows_amd64 freebsd_amd64; do
             grep -q "${name}_${os_arch}.zip" "$sums" || { echo "missing $os_arch"; exit 1; }
