@@ -1,0 +1,42 @@
+# Regenerates docs/ with tfplugindocs and fails when the committed files differ.
+# On a difference the job prints the regenerated docs/ as a base64 tarball in
+# the log (decode the block between the markers), for when the docs cannot be
+# produced on a developer workstation. Push a branch named docs/<anything> (or
+# dispatch this workflow) to get the block without touching main.
+name: docs
+
+on:
+  push:
+    branches: [main, "docs/**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.27.3"
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_wrapper: false
+      - name: Generate docs
+        run: go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs@v0.25.0 generate --provider-name phron
+      - name: Docs match the committed files
+        run: |
+          git add -N docs
+          if git diff --quiet -- docs; then echo "docs are up to date"; exit 0; fi
+          git diff --stat -- docs
+          tar czf "$RUNNER_TEMP/docs.tgz" docs
+          sha256sum "$RUNNER_TEMP/docs.tgz"
+          echo "-----BEGIN DOCS-----"
+          base64 -w 0 "$RUNNER_TEMP/docs.tgz" | fold -w 1000
+          echo
+          echo "-----END DOCS-----"
+          echo "docs/ is out of date: regenerate with tfplugindocs v0.25.0 and commit"
+          exit 1

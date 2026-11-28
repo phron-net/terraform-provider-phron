@@ -1,0 +1,25 @@
+---
+page_title: "Provider: Phron"
+description: |-
+  Manage Phron Servers and Object Storage.
+---
+
+# Phron provider
+
+{{ .Description }}
+
+## Credentials
+
+The provider signs in as an **API client**: an OAuth client-credentials machine user of your Organization, created on the console's API clients page (an Organization Admin makes one, picks its Role, and sees the client ID and secret once). The page also shows the project id used in the scope. The Role of the API client decides what the provider may do: a Viewer cannot create or delete anything, and a Developer can manage Servers, SSH keys, buckets and its own keys but cannot delete a bucket (destroying a bucket needs the Admin Role).
+
+Either `project_id` or `scope` is required.
+
+## Secrets live in the state
+
+`phron_storage_key.secret_access_key` is returned by the API once, at creation, so Terraform keeps it in the state file (marked sensitive, but stored in plain text). `phron_server.user_data` is kept from your configuration (the API never returns it) and is also marked sensitive. Store the state in a backend that encrypts it and restricts who can read it, and do not put secrets in `user_data`.
+
+## Example usage
+
+{{ tffile "examples/provider/provider.tf" }}
+
+{{ .SchemaMarkdown | trimspace }}
