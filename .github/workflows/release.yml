@@ -1,0 +1,57 @@
+# Release: a pushed `v*` tag builds the provider with GoReleaser, signs the
+# checksum file with the release key and publishes a GitHub release in the
+# layout the OpenTofu and Terraform registries read (per-platform zips,
+# `<name>_<version>_SHA256SUMS`, its detached `.sig`, and the registry manifest
+# `<name>_<version>_manifest.json`). Nothing else triggers it.
+#
+# The key is the GPG key whose public half is keys/phron-provider-release.asc
+# (and is submitted to the registries). Its private half and passphrase reach
+# this repository as the Actions secrets GPG_PRIVATE_KEY and PASSPHRASE.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    # GitHub-hosted: this is a public repository.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.27.3"
+      - name: Import the signing key
+        id: gpg
+        uses: crazy-max/ghaction-import-gpg@v7.0.0
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.PASSPHRASE }}
+      - name: The imported key is the one the registries know
+        env:
+          IMPORTED: ${{ steps.gpg.outputs.fingerprint }}
+        run: |
+          published=$(gpg --show-keys --with-colons keys/phron-provider-release.asc | awk -F: '/^fpr/ {print $10; exit}')
+          if [ "$IMPORTED" != "$published" ]; then
+            echo "imported key $IMPORTED differs from keys/phron-provider-release.asc ($published)"; exit 1
+          fi
+          # A signature made now must verify against the published public key.
+          echo probe > "$RUNNER_TEMP/probe"
+          gpg --batch --local-user "$IMPORTED" --detach-sign --output "$RUNNER_TEMP/probe.sig" "$RUNNER_TEMP/probe"
+          home=$(mktemp -d)
+          GNUPGHOME=$home gpg --batch --import keys/phron-provider-release.asc
+          GNUPGHOME=$home gpg --batch --verify "$RUNNER_TEMP/probe.sig" "$RUNNER_TEMP/probe"
+      - uses: goreleaser/goreleaser-action@v7.3.0
+        with:
+          distribution: goreleaser
+          version: v2.20.2
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GPG_FINGERPRINT: ${{ steps.gpg.outputs.fingerprint }}

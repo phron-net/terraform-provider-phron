@@ -73,6 +73,16 @@ Full descriptions of every attribute: [docs/index.md](docs/index.md). Examples: 
 
 Unit tests run against an in-process Connect server (`internal/provider/*_test.go`). Acceptance tests (`TestAcc*`) create real, billed objects and run only with `TF_ACC=1` and credentials in the environment; CI does not run them.
 
+## Releases
+
+A release is a pushed `vX.Y.Z` tag: the `release` workflow builds the provider for Linux, macOS, Windows and FreeBSD with GoReleaser, signs the `SHA256SUMS` file and publishes a GitHub release. The signing key is `Phron Provider Release <security@phron.net>`, fingerprint `4436 898F 0F73 4FE8 43A8 199E ADAF 3F40 8DB8 38BD`; its public half is [keys/phron-provider-release.asc](keys/phron-provider-release.asc). To check a download:
+
+```sh
+gpg --import keys/phron-provider-release.asc
+gpg --verify terraform-provider-phron_<version>_SHA256SUMS.sig terraform-provider-phron_<version>_SHA256SUMS
+sha256sum -c --ignore-missing terraform-provider-phron_<version>_SHA256SUMS
+```
+
 ## License
 
 Apache License 2.0. See [LICENSE](LICENSE).
