@@ -3,8 +3,10 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"connectrpc.com/connect"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
@@ -18,8 +20,9 @@ import (
 )
 
 var (
-	_ resource.Resource              = (*storageBucketResource)(nil)
-	_ resource.ResourceWithConfigure = (*storageBucketResource)(nil)
+	_ resource.Resource                = (*storageBucketResource)(nil)
+	_ resource.ResourceWithConfigure   = (*storageBucketResource)(nil)
+	_ resource.ResourceWithImportState = (*storageBucketResource)(nil)
 )
 
 // NewStorageBucketResource returns the phron_storage_bucket resource.
@@ -67,12 +70,12 @@ func (r *storageBucketResource) Schema(_ context.Context, _ resource.SchemaReque
 			"location": schema.StringAttribute{
 				Optional:      true,
 				Description:   "The Location id of the storage. Required when creating the Workspace's first storage while more than one Location is offered, and when the Workspace has storage in two Locations.",
-				PlanModifiers: replace,
+				PlanModifiers: []planmodifier.String{replaceUnlessImported()},
 			},
 			"workspace_id": schema.StringAttribute{
 				Optional:      true,
 				Description:   "The Workspace the bucket belongs to. Empty means the Organization's default Workspace.",
-				PlanModifiers: replace,
+				PlanModifiers: []planmodifier.String{replaceUnlessImported()},
 			},
 			"object_lock": schema.BoolAttribute{
 				Optional:      true,
@@ -183,7 +186,12 @@ func findBucket(ctx context.Context, c *Clients, workspaceID, location, fullName
 // doRead refreshes the model; gone=true when the bucket (or the storage) does
 // not exist any more.
 func (r *storageBucketResource) doRead(ctx context.Context, m *storageBucketModel) (gone bool, err error) {
-	b, err := findBucket(ctx, r.clients, m.WorkspaceID.ValueString(), m.Location.ValueString(), m.FullName.ValueString())
+	// After an import only the id is known (the full name).
+	full := m.FullName.ValueString()
+	if full == "" {
+		full = m.ID.ValueString()
+	}
+	b, err := findBucket(ctx, r.clients, m.WorkspaceID.ValueString(), m.Location.ValueString(), full)
 	if isNotFound(err) {
 		return true, nil
 	}
@@ -195,6 +203,27 @@ func (r *storageBucketResource) doRead(ctx context.Context, m *storageBucketMode
 	}
 	m.ID = types.StringValue(b.GetName())
 	m.FullName = types.StringValue(b.GetName())
+	if m.Name.IsNull() || m.Name.IsUnknown() {
+		// An imported bucket: name is the part after the Cell's bucket name prefix.
+		o, err := r.clients.Storage.GetStorageOverview(ctx, connect.NewRequest(&phronv1.GetStorageOverviewRequest{
+			WorkspaceId: m.WorkspaceID.ValueString(),
+			Location:    m.Location.ValueString(),
+		}))
+		if err != nil {
+			return false, err
+		}
+		prefixes := []string{o.Msg.GetBucketNamePrefix()}
+		for _, c := range o.Msg.GetCells() {
+			prefixes = append(prefixes, c.GetBucketNamePrefix())
+		}
+		m.Name = types.StringValue(b.GetName())
+		for _, p := range prefixes {
+			if p != "" && strings.HasPrefix(b.GetName(), p) {
+				m.Name = types.StringValue(strings.TrimPrefix(b.GetName(), p))
+				break
+			}
+		}
+	}
 	// The limit is read back only while this resource manages it (limit_bytes
 	// is in the state). A bucket whose limit comes from a
 	// phron_storage_bucket_limit resource must not show that limit as a change.
@@ -290,4 +319,10 @@ func (r *storageBucketResource) Delete(ctx context.Context, req resource.DeleteR
 	if err := r.doDelete(ctx, &m); err != nil {
 		addErr(&resp.Diagnostics, "Deleting the bucket failed", err)
 	}
+}
+
+// ImportState imports a bucket by its full name (the id): `terraform import phron_storage_bucket.x <full name>`.
+func (r *storageBucketResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("full_name"), req.ID)...)
 }

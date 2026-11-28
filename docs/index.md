@@ -17,7 +17,7 @@ Required: `name`, `operating_system_id`, `ssh_key_ids` (set), `location`, `vcpus
 Optional: `tier` (`shared`, the default, or `dedicated`), `workspace_id`, `user_data` (cloud-init, sensitive), `restore_from_backup_id`.
 Computed: `id`, `state`, `power`, `ipv6_prefix`, `ssh_address`.
 
-Changing `vcpus`, `memory_gib` or `disk_gib` resizes the Server in place (the disk never shrinks). Every other argument forces a new Server. Import: `terraform import phron_server.web <server id>` (then set `user_data` as configured; the API does not return it).
+Changing `vcpus`, `memory_gib` or `disk_gib` resizes the Server in place (the disk never shrinks). Every other argument forces a new Server. Import: `terraform import phron_server.web <server id>` (then set `user_data` as configured; the API does not return it, and setting it on an imported Server does not replace it).
 
 ## Resource `phron_ssh_key`
 
@@ -27,6 +27,7 @@ Required: `name`, `public_key`. Computed: `id`, `fingerprint`. Both arguments fo
 
 Required: `name`. Optional: `location`, `workspace_id`, `object_lock` (bool, set at creation only), `object_lock_default_retention_days` (needs `object_lock`), `limit_bytes`.
 Computed: `id` and `full_name` (the bucket name S3 tools use: the shared Cell's prefix plus `name`).
+Import: `terraform import phron_storage_bucket.logs <full name>` (then set `location` and `workspace_id` as configured; they are not read back).
 
 ## Resource `phron_storage_bucket_limit`
 

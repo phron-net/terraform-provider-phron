@@ -117,13 +117,13 @@ func (r *serverResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				Optional:  true,
 				Sensitive: true,
 				Description: "Cloud-init user data run once at first boot, after the platform's own part: plain text of at most 65536 bytes whose first line is `#cloud-config`, `#!`, `#cloud-boothook` or `#include`. " +
-					"Never returned by the API, so it is kept from your configuration. Not a place for secrets: anyone who can read the guest's disk can read it. Changing it replaces the Server (cloud-init runs once per instance).",
-				PlanModifiers: replace,
+					"Never returned by the API, so it is kept from your configuration. Not a place for secrets: anyone who can read the guest's disk can read it. Changing it replaces the Server (cloud-init runs once per instance); setting it on an imported Server does not.",
+				PlanModifiers: []planmodifier.String{replaceUnlessImported()},
 			},
 			"restore_from_backup_id": schema.StringAttribute{
 				Optional:      true,
 				Description:   "Start the Server from a Backup or Snapshot of a deleted Server of the same Organization. The Operating System of that Server is used and operating_system_id is ignored by the API.",
-				PlanModifiers: replace,
+				PlanModifiers: []planmodifier.String{replaceUnlessImported()},
 			},
 			"state": schema.StringAttribute{
 				Computed:    true,

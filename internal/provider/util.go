@@ -11,6 +11,8 @@ import (
 	"connectrpc.com/connect"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"golang.org/x/oauth2"
 )
@@ -129,4 +131,17 @@ func stringsToSet(in []string) types.Set {
 // enumWord turns SERVER_STATE_RUNNING into "running".
 func enumWord(prefix, name string) string {
 	return strings.ToLower(strings.TrimPrefix(name, prefix))
+}
+
+// replaceUnlessImported replaces the resource when the attribute changes, except when the state holds no value for it:
+// the API never returns some arguments (user_data), so an imported resource has none, and giving it its configured
+// value must not replace it.
+func replaceUnlessImported() planmodifier.String {
+	return stringplanmodifier.RequiresReplaceIf(
+		func(_ context.Context, req planmodifier.StringRequest, resp *stringplanmodifier.RequiresReplaceIfFuncResponse) {
+			resp.RequiresReplace = !req.StateValue.IsNull()
+		},
+		"Changing it replaces the resource, unless the state has no value (an imported resource).",
+		"Changing it replaces the resource, unless the state has no value (an imported resource).",
+	)
 }
